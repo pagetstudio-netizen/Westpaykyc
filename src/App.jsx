@@ -1,6 +1,63 @@
 import { useState } from "react";
 import "./style.css";
 
+function UploadBox({ title, subtitle }) {
+  const [file, setFile] = useState(null);
+  const [showCheck, setShowCheck] = useState(false);
+
+  const handleChange = (e) => {
+    const selected = e.target.files?.[0];
+
+    if (!selected) return;
+
+    setFile({
+      name: selected.name,
+      url: URL.createObjectURL(selected),
+      type: selected.type
+    });
+
+    setShowCheck(true);
+
+    setTimeout(() => {
+      setShowCheck(false);
+    }, 1400);
+  };
+
+  return (
+    <label className="upload-box">
+
+      <input
+        type="file"
+        accept="image/*,.pdf"
+        hidden
+        onChange={handleChange}
+      />
+
+      {file && file.type.startsWith("image/") ? (
+        <div className="upload-preview">
+          <img src={file.url} alt={title} />
+        </div>
+      ) : (
+        <strong>↑</strong>
+      )}
+
+      <span>
+        {file ? "Uploaded successfully" : title}
+        <small>
+          {file ? file.name : subtitle}
+        </small>
+      </span>
+
+      {showCheck && (
+        <div className="upload-success">
+          <div className="check">✓</div>
+        </div>
+      )}
+
+    </label>
+  );
+}
+
 export default function App() {
   const [submitted, setSubmitted] = useState(false);
 
@@ -167,57 +224,25 @@ export default function App() {
 
             <div className="upload-grid">
 
-              <label className="upload-box">
-                <input type="file" hidden />
+              <UploadBox
+                title="ID Card — Front"
+                subtitle="Upload document"
+/>
 
-                <strong>↑</strong>
+              <UploadBox
+                title="ID Card — Back"
+                subtitle="Upload document"
+/>
 
-                <span>
-                  ID Card — Front
-                  <small>
-                    Upload document
-                  </small>
-                </span>
-              </label>
+              <UploadBox
+                title="Selfie 🤳"
+                subtitle="Upload clear photo"
+/>
 
-              <label className="upload-box">
-                <input type="file" hidden />
-
-                <strong>↑</strong>
-
-                <span>
-                  ID Card — Back
-                  <small>
-                    Upload document
-                  </small>
-                </span>
-              </label>
-
-              <label className="upload-box">
-                <input type="file" hidden />
-
-                <strong>↑</strong>
-
-                <span>
-                  Selfie 🤳
-                  <small>
-                    Upload clear photo
-                  </small>
-                </span>
-              </label>
-
-              <label className="upload-box">
-                <input type="file" hidden />
-
-                <strong>↑</strong>
-
-                <span>
-                  Proof of address
-                  <small>
-                    Upload document
-                  </small>
-                </span>
-              </label>
+              <UploadBox
+                title="Proof of address"
+                subtitle="Upload document"
+/>
 
             </div>
 
