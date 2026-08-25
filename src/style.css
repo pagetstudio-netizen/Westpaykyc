@@ -477,3 +477,11 @@ footer div {
     padding: 42px 24px;
   }
 }
+
+.logo img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  border-radius: 9px;
+}
+

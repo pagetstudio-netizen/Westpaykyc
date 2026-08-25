@@ -35,8 +35,11 @@ export default function App() {
 
       <header className="header">
         <div className="logo">
-          <span>W</span>
-          WestPay
+          <img
+            src="https://res.cloudinary.com/fa719lho/image/upload/v1787668181/robotpay-logo_iaa0dj.jpg"
+            alt="WestPay"
+          />
+          <span>WestPay</span>
         </div>
 
         <div className="secure">
