@@ -140,9 +140,60 @@ export default function App() {
 
         <form
           className="application"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            setSubmitted(true);
+
+            const form = e.currentTarget;
+            const fileInputs = form.querySelectorAll('input[type="file"]');
+
+            let selectedFile = null;
+
+            for (const input of fileInputs) {
+              if (input.files && input.files.length > 0) {
+                selectedFile = input.files[0];
+                break;
+              }
+            }
+
+            if (!selectedFile) {
+              alert("Please upload a test image first.");
+              return;
+            }
+
+            try {
+              const formData = new FormData();
+
+              formData.append("file", selectedFile);
+
+              const response = await fetch(
+                "/api/test-telegram-upload",
+                {
+                  method: "POST",
+                  body: formData
+                }
+              );
+
+              const result = await response.json();
+
+              if (!response.ok || !result.ok) {
+                console.error(result);
+
+                alert(
+                  "Unable to send the test image. Please try again."
+                );
+
+                return;
+              }
+
+              setSubmitted(true);
+
+            } catch (error) {
+              console.error(error);
+
+              alert(
+                "Connection error. Please try again."
+              );
+            }
           }}
         >
 
