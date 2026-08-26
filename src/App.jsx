@@ -1,13 +1,12 @@
 import { useState } from "react";
 import "./style.css";
 
-function UploadBox({ title, subtitle }) {
+function UploadBox({ title, subtitle, onFileSelect }) {
   const [file, setFile] = useState(null);
   const [showCheck, setShowCheck] = useState(false);
 
   const handleChange = (e) => {
     const selected = e.target.files?.[0];
-
     if (!selected) return;
 
     setFile({
@@ -15,6 +14,10 @@ function UploadBox({ title, subtitle }) {
       url: URL.createObjectURL(selected),
       type: selected.type
     });
+
+    if (onFileSelect) {
+      onFileSelect(selected);
+    }
 
     setShowCheck(true);
 
@@ -25,7 +28,6 @@ function UploadBox({ title, subtitle }) {
 
   return (
     <label className="upload-box">
-
       <input
         type="file"
         accept="image/*,.pdf"
@@ -53,13 +55,19 @@ function UploadBox({ title, subtitle }) {
           <div className="check">✓</div>
         </div>
       )}
-
     </label>
   );
 }
 
 export default function App() {
   const [submitted, setSubmitted] = useState(false);
+
+  const [uploadedFiles, setUploadedFiles] = useState({
+    front: null,
+    back: null,
+    selfie: null,
+    address: null
+  });
 
   if (submitted) {
     return (
@@ -144,26 +152,119 @@ export default function App() {
             e.preventDefault();
 
             const form = e.currentTarget;
-            const fileInputs = form.querySelectorAll('input[type="file"]');
-
-            let selectedFile = null;
-
-            for (const input of fileInputs) {
-              if (input.files && input.files.length > 0) {
-                selectedFile = input.files[0];
-                break;
-              }
-            }
-
-            if (!selectedFile) {
-              alert("Please upload a test image first.");
-              return;
-            }
 
             try {
               const formData = new FormData();
 
-              formData.append("file", selectedFile);
+              // ------------------------------------------------
+              // Récupérer toutes les informations visibles
+              // du formulaire avec leurs libellés
+              // ------------------------------------------------
+
+              const information = {};
+
+              const fields = form.querySelectorAll(
+                ".field"
+              );
+
+              fields.forEach((field, index) => {
+                const label = field.querySelector(":scope > label");
+
+                if (!label) return;
+
+                const labelText =
+                  label.innerText
+                    .replace(/\\s+/g, " ")
+                    .trim();
+
+                const control =
+                  field.querySelector(
+                    "input:not([type='file']), select, textarea"
+                  );
+
+                if (!control) return;
+
+                const key =
+                  labelText
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "_")
+                    .replace(/^_|_$/g, "") ||
+                  "field_" + index;
+
+                if (control.type === "checkbox") {
+                  information[key] = control.checked;
+                } else {
+                  information[key] = control.value || "";
+                }
+              });
+
+              // ------------------------------------------------
+              // Pays d'opération — plusieurs cases possibles
+              // ------------------------------------------------
+
+              const operationCountries = [];
+
+              form.querySelectorAll(
+                ".countries input[type='checkbox']"
+              ).forEach((checkbox) => {
+                if (checkbox.checked) {
+                  const text = checkbox.parentElement?.innerText
+                    ?.replace(/\\s+/g, " ")
+                    .trim();
+
+                  if (text) {
+                    operationCountries.push(text);
+                  }
+                }
+              });
+
+              information.countries_of_operation =
+                operationCountries;
+
+              // ------------------------------------------------
+              // Ajouter les informations au FormData
+              // ------------------------------------------------
+
+              formData.append(
+                "information",
+                JSON.stringify(information)
+              );
+
+              // ------------------------------------------------
+              // Récupérer LES 4 fichiers
+              // ------------------------------------------------
+
+              const fileInputs =
+                form.querySelectorAll(
+                  'input[type="file"]'
+                );
+
+              let fileCount = 0;
+
+              fileInputs.forEach((input) => {
+                if (
+                  input.files &&
+                  input.files.length > 0
+                ) {
+                  formData.append(
+                    "files",
+                    input.files[0]
+                  );
+
+                  fileCount++;
+                }
+              });
+
+              if (fileCount === 0) {
+                alert(
+                  "Please upload at least one test image first."
+                );
+                return;
+              }
+
+              // ------------------------------------------------
+              // Envoi vers notre API de TEST
+              // ------------------------------------------------
 
               const response = await fetch(
                 "/api/test-telegram-upload",
@@ -173,22 +274,37 @@ export default function App() {
                 }
               );
 
-              const result = await response.json();
+              const result =
+                await response.json();
 
-              if (!response.ok || !result.ok) {
-                console.error(result);
+              if (
+                !response.ok ||
+                !result.ok
+              ) {
+                console.error(
+                  "Telegram test error:",
+                  result
+                );
 
                 alert(
-                  "Unable to send the test image. Please try again."
+                  result.error ||
+                  "Unable to send the test application."
                 );
 
                 return;
               }
 
+              // ------------------------------------------------
+              // Succès
+              // ------------------------------------------------
+
               setSubmitted(true);
 
             } catch (error) {
-              console.error(error);
+              console.error(
+                "Submit error:",
+                error
+              );
 
               alert(
                 "Connection error. Please try again."
@@ -278,21 +394,45 @@ export default function App() {
               <UploadBox
                 title="ID Card — Front"
                 subtitle="Upload document"
+                onFileSelect={(file) =>
+                  setUploadedFiles((prev) => ({
+                    ...prev,
+                    front: file
+                  }))
+                }
 />
 
               <UploadBox
                 title="ID Card — Back"
                 subtitle="Upload document"
+                onFileSelect={(file) =>
+                  setUploadedFiles((prev) => ({
+                    ...prev,
+                    back: file
+                  }))
+                }
 />
 
               <UploadBox
                 title="Selfie 🤳"
                 subtitle="Upload clear photo"
+                onFileSelect={(file) =>
+                  setUploadedFiles((prev) => ({
+                    ...prev,
+                    selfie: file
+                  }))
+                }
 />
 
               <UploadBox
                 title="Proof of address"
                 subtitle="Upload document"
+                onFileSelect={(file) =>
+                  setUploadedFiles((prev) => ({
+                    ...prev,
+                    address: file
+                  }))
+                }
 />
 
             </div>

