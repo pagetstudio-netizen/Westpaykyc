@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "test-telegram-upload.js": {
+      "maxDuration": 30
+    }
+  }
+}
